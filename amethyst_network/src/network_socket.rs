@@ -8,13 +8,15 @@ use std::{
     thread,
 };
 
-use amethyst_core::specs::{Join, Resources, System, SystemData, WriteStorage};
+use amethyst_core::specs::{Join, Resources, System, SystemData, WriteStorage, Entities};
 use laminar::error;
 use laminar::net::UdpSocket;
 use laminar::{DeliveryMethod, NetworkConfig, Packet};
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::{deserialize_event, send_event, ConnectionState, NetConnection, NetEvent, NetFilter};
+
+use log::info;
 
 enum InternalSocketEvent<E> {
     SendEvents {
@@ -160,13 +162,17 @@ impl<'a, E> System<'a> for NetSocketSystem<E>
 where
     E: Send + Sync + Serialize + Clone + DeserializeOwned + PartialEq + 'static,
 {
-    type SystemData = (WriteStorage<'a, NetConnection<E>>);
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, NetConnection<E>>
+    );
 
     fn setup(&mut self, res: &mut Resources) {
         Self::SystemData::setup(res);
     }
 
-    fn run(&mut self, mut net_connections: Self::SystemData) {
+    fn run(&mut self, (entities, mut net_connections): Self::SystemData) {
+        info!("start of NS::run");
         for mut net_connection in (&mut net_connections).join() {
             let target = net_connection.target;
 
@@ -186,28 +192,43 @@ where
         }
 
         for raw_event in self.rx.try_iter() {
-            let mut matched = false;
-            // Get the NetConnection from the source
-            for mut net_connection in (&mut net_connections).join() {
-                // We found the origin
-                if net_connection.target == raw_event.source {
-                    matched = true;
-                    // Get the event
-                    let net_event = deserialize_event::<E>(raw_event.data.as_slice());
-                    match net_event {
-                        Ok(ev) => {
-                            net_connection.receive_buffer.single_write(ev);
+            for _ in 0..2 {
+                let mut matched = false;
+                // Get the NetConnection from the source
+                for mut net_connection in (&mut net_connections).join() {
+                    // We found the origin
+                    if net_connection.target == raw_event.source {
+                        matched = true;
+                        // Get the event
+                        let net_event = deserialize_event::<E>(raw_event.data.as_slice());
+                        match net_event {
+                            Ok(ev) => {
+                                net_connection.receive_buffer.single_write(ev);
+                            }
+                            Err(e) => error!(
+                                "Failed to deserialize an incoming network event: {} From source: {:?}",
+                                e, raw_event.source
+                            ),
                         }
-                        Err(e) => error!(
-                            "Failed to deserialize an incoming network event: {} From source: {:?}",
-                            e, raw_event.source
-                        ),
+                        // No two NetConnections can share a target
+                        break;
                     }
                 }
                 if !matched {
-                    println!("Received packet from unknown source");
+                    // Instead of just complaining about missing this source we are going to make a
+                    // new NetConnection to receive from this source
+                    // TODO: This is of course susceptible to DoS so uhhhh we need to deal with that
+                    // Bring in the entities so that we can add a NetConnection
+                    info!("MAKING A NETCONNECTION!!!! LOL GREP FOR XDXD");
+                    entities.build_entity()
+                        .with(NetConnection::<E>::new(raw_event.source), &mut net_connections)
+                        .build();
+                }
+                else {
+                    break
                 }
             }
         }
+        info!("end of NS::run");
     }
 }
