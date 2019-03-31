@@ -2,10 +2,11 @@
 
 use amethyst_input::is_close_requested;
 
+use derivative::Derivative;
+
 use crate::{ecs::prelude::World, GameData, StateEvent};
 
-use std::fmt::Result as FmtResult;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 /// Error type for errors occurring in StateMachine
 #[derive(Debug)]
@@ -25,10 +26,7 @@ impl Display for StateError {
 }
 
 /// State data encapsulates the data sent to all state functions from the application main loop.
-pub struct StateData<'a, T>
-where
-    T: 'a,
-{
+pub struct StateData<'a, T> {
     /// Main `World`
     pub world: &'a mut World,
     /// User defined game data
@@ -76,7 +74,7 @@ pub type EmptyTrans = Trans<(), StateEvent>;
 
 /// A simple default `Trans`. Made to be used with `SimpleState`.
 /// By default it contains a `GameData` as its `StateData` and doesn't have a custom event type.
-pub type SimpleTrans<'a, 'b> = Trans<GameData<'a, 'b>, StateEvent>;
+pub type SimpleTrans = Trans<GameData<'static, 'static>, StateEvent>;
 
 /// A trait which defines game states that can be used by the state machine.
 pub trait State<T, E: Send + Sync + 'static> {
@@ -226,7 +224,7 @@ impl<T: EmptyState> State<(), StateEvent> for T {
 }
 
 /// A simple `State` trait. It contains `GameData` as its `StateData` and no custom `StateEvent`.
-pub trait SimpleState<'a, 'b> {
+pub trait SimpleState {
     /// Executed when the game state begins.
     fn on_start(&mut self, _data: StateData<'_, GameData<'_, '_>>) {}
 
@@ -244,7 +242,7 @@ pub trait SimpleState<'a, 'b> {
         &mut self,
         _data: StateData<'_, GameData<'_, '_>>,
         event: StateEvent,
-    ) -> SimpleTrans<'a, 'b> {
+    ) -> SimpleTrans {
         if let StateEvent::Window(event) = &event {
             if is_close_requested(&event) {
                 Trans::Quit
@@ -258,12 +256,12 @@ pub trait SimpleState<'a, 'b> {
 
     /// Executed repeatedly at stable, predictable intervals (1/60th of a second
     /// by default).
-    fn fixed_update(&mut self, _data: StateData<'_, GameData<'_, '_>>) -> SimpleTrans<'a, 'b> {
+    fn fixed_update(&mut self, _data: StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
         Trans::None
     }
 
     /// Executed on every frame immediately, as fast as the engine will allow (taking into account the frame rate limit).
-    fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans<'a, 'b> {
+    fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
         Trans::None
     }
 
@@ -279,7 +277,7 @@ pub trait SimpleState<'a, 'b> {
     fn shadow_update(&mut self, _data: StateData<'_, GameData<'_, '_>>) {}
 }
 
-impl<'a, 'b, T: SimpleState<'a, 'b>> State<GameData<'a, 'b>, StateEvent> for T {
+impl<T: SimpleState> State<GameData<'static, 'static>, StateEvent> for T {
     //pub trait SimpleState<'a,'b>: State<GameData<'a,'b>,()> {
 
     /// Executed when the game state begins.
@@ -307,18 +305,18 @@ impl<'a, 'b, T: SimpleState<'a, 'b>> State<GameData<'a, 'b>, StateEvent> for T {
         &mut self,
         data: StateData<'_, GameData<'_, '_>>,
         event: StateEvent,
-    ) -> SimpleTrans<'a, 'b> {
+    ) -> SimpleTrans {
         self.handle_event(data, event)
     }
 
     /// Executed repeatedly at stable, predictable intervals (1/60th of a second
     /// by default).
-    fn fixed_update(&mut self, data: StateData<'_, GameData<'_, '_>>) -> SimpleTrans<'a, 'b> {
+    fn fixed_update(&mut self, data: StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
         self.fixed_update(data)
     }
 
     /// Executed on every frame immediately, as fast as the engine will allow (taking into account the frame rate limit).
-    fn update(&mut self, mut data: StateData<'_, GameData<'_, '_>>) -> SimpleTrans<'a, 'b> {
+    fn update(&mut self, mut data: StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
         let r = self.update(&mut data);
         data.data.update(&data.world);
         r

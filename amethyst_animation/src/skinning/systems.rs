@@ -1,10 +1,12 @@
 use amethyst_core::{
-    specs::prelude::{
+    ecs::prelude::{
         BitSet, ComponentEvent, Join, ReadStorage, ReaderId, Resources, System, WriteStorage,
     },
     GlobalTransform,
 };
 use amethyst_renderer::JointTransforms;
+
+use log::error;
 
 use super::resources::*;
 
@@ -45,7 +47,8 @@ impl<'a> System<'a> for VertexSkinningSystem {
             .channel()
             .read(self.updated_id.as_mut().expect(
                 "`VertexSkinningSystem::setup` was not called before `VertexSkinningSystem::run`",
-            )).for_each(|event| match event {
+            ))
+            .for_each(|event| match event {
                 ComponentEvent::Inserted(id) | ComponentEvent::Modified(id) => {
                     self.updated.add(*id);
                 }
@@ -78,7 +81,8 @@ impl<'a> System<'a> for VertexSkinningSystem {
                             );
                             None
                         }
-                    }).flatten()
+                    })
+                    .flatten()
                     .map(|(global, inverse_bind_matrix)| {
                         (global.0 * inverse_bind_matrix * bind_shape)
                     }),
@@ -98,7 +102,7 @@ impl<'a> System<'a> for VertexSkinningSystem {
             }
         }
 
-        for (_, mesh_global, mut joint_transform) in
+        for (_, mesh_global, joint_transform) in
             (&self.updated, &global_transforms, &mut matrices).join()
         {
             if let Some(global_inverse) = mesh_global.0.try_inverse() {
@@ -120,7 +124,7 @@ impl<'a> System<'a> for VertexSkinningSystem {
     }
 
     fn setup(&mut self, res: &mut Resources) {
-        use amethyst_core::specs::prelude::SystemData;
+        use amethyst_core::ecs::prelude::SystemData;
         Self::SystemData::setup(res);
         let mut transform = WriteStorage::<GlobalTransform>::fetch(res);
         self.updated_id = Some(transform.register_reader());

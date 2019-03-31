@@ -3,17 +3,25 @@
 //! This modules contains an extension trait for the System trait which adds useful transformation
 //! functions.
 
+use crate::ecs::prelude::{Read, System};
 use shred::{RunningTime, SystemData};
-use specs::prelude::{Read, System};
 
 /// Extension functionality associated systems.
 pub trait SystemExt {
     /// Make a system pausable by tying it to a specific value of a resource.
     ///
+    /// When the value of the resource differs from `value` the system is considered "paused",
+    /// and the `run` method of the pausable system will not be called.
+    ///
+    /// # Notes
+    ///
+    /// Special care must be taken not to read from an `EventChannel` with pausable systems.
+    /// Since `run` is never called, there is no way to consume the reader side of a channel, and
+    /// it may grow indefinitely leaking memory while the system is paused.
+    ///
     /// # Examples
     ///
     /// ```rust
-    /// # extern crate amethyst;
     /// use amethyst::{
     ///     ecs::{System, Write},
     ///     shred::DispatcherBuilder,
@@ -85,7 +93,11 @@ where
     }
 }
 
-/// A system that is enabled when `U` has a specific value.
+/// A system that is enabled when `V` has a specific value.
+///
+/// This is created using the [`SystemExt::pausable`] method.
+///
+/// [`SystemExt::pausable`]: trait.SystemExt.html#tymethod.pausable
 pub struct Pausable<S, V> {
     system: S,
     value: V,

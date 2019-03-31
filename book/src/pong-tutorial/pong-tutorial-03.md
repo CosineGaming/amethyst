@@ -50,21 +50,18 @@ Next, we'll add an `InputBundle` to the game's `Application` object, that
 contains an `InputHandler` system which captures inputs, and maps them to the
 axes we defined. Let's make the following changes to `main.rs`.
 
-```rust,no_run,noplaypen
+```rust,edition2018,no_run,noplaypen
 # extern crate amethyst;
 # use amethyst::prelude::*;
 # use amethyst::core::transform::TransformBundle;
-# use amethyst::utils::application_root_dir;
+# use amethyst::utils::application_dir;
 # use amethyst::renderer::{DisplayConfig, DrawFlat, Event, Pipeline,
 #                        PosTex, RenderBundle, Stage, VirtualKeyCode};
 # macro_rules! env { ($x:expr) => ("") }
 # fn main() -> amethyst::Result<()> {
 use amethyst::input::InputBundle;
 
-let binding_path = format!(
-    "{}/resources/bindings_config.ron",
-    application_root_dir()
-);
+let binding_path = application_dir("resources/bindings_config.ron")?;
 
 let input_bundle = InputBundle::<String, String>::new()
     .with_bindings_from_file(binding_path)?;
@@ -76,7 +73,7 @@ let input_bundle = InputBundle::<String, String>::new()
 #       .with_pass(DrawFlat::<PosTex>::new()),
 # );
 # struct Pong;
-# impl<'a, 'b> SimpleState<'a, 'b> for Pong { }
+# impl SimpleState for Pong { }
 let game_data = GameDataBuilder::default()
     .with_bundle(RenderBundle::new(pipe, Some(config)).with_sprite_sheet_processor())?
     .with_bundle(TransformBundle::new())?
@@ -105,7 +102,7 @@ pub use self::paddle::PaddleSystem;
 
 We're finally ready to implement the `PaddleSystem` in `systems/paddle.rs`:
 
-```rust,no_run,noplaypen
+```rust,edition2018,no_run,noplaypen
 # extern crate amethyst;
 #
 # mod pong {
@@ -131,7 +128,7 @@ use amethyst::ecs::{Join, Read, ReadStorage, System, WriteStorage};
 use amethyst::input::InputHandler;
 
 // You'll have to mark PADDLE_HEIGHT as public in pong.rs
-use pong::{Paddle, Side, ARENA_HEIGHT, PADDLE_HEIGHT};
+use crate::pong::{Paddle, Side, ARENA_HEIGHT, PADDLE_HEIGHT};
 
 pub struct PaddleSystem;
 
@@ -197,7 +194,7 @@ immutably for the `Paddle` and mutably for the `Transform`.
 
 Let's add this system to our `GameDataBuilder` in `main.rs`:
 
-```rust,no_run,noplaypen
+```rust,edition2018,no_run,noplaypen
 mod systems; // Import the module
 // --snip--
 
@@ -246,7 +243,7 @@ If we run the game now, we'll see the console print our keypresses. Let's
 make it update the position of the paddle. To do this, we'll modify the y
 component of the transform's translation.
 
-```rust,no_run,noplaypen
+```rust,edition2018,no_run,noplaypen
 # extern crate amethyst;
 # use amethyst::core::Transform;
 # use amethyst::ecs::{Join, Read, ReadStorage, System, WriteStorage};
@@ -276,7 +273,7 @@ component of the transform's translation.
       };
       if let Some(mv_amount) = movement {
         let scaled_amount = 1.2 * mv_amount as f32;
-        transform.translate_y(scaled_amount);
+        transform.prepend_translation_y(scaled_amount);
       }
     }
   }
@@ -302,7 +299,7 @@ to `PADDLE_HEIGHT * 0.5` (the bottom of the arena plus the offset).
 
 Our run function should now look something like this:
 
-```rust,no_run,noplaypen
+```rust,edition2018,no_run,noplaypen
 # extern crate amethyst;
 # use amethyst::core::Transform;
 # use amethyst::ecs::{Join, Read, ReadStorage, System, WriteStorage};
@@ -337,7 +334,7 @@ Our run function should now look something like this:
       if let Some(mv_amount) = movement {
         let scaled_amount = 1.2 * mv_amount as f32;
         let paddle_y = transform.translation().y;
-        transform.set_y(
+        transform.set_translation_y(
             (paddle_y + scaled_amount)
                 .min(ARENA_HEIGHT - PADDLE_HEIGHT * 0.5)
                 .max(PADDLE_HEIGHT * 0.5),
@@ -357,7 +354,7 @@ Now that we have a system in place that uses the `Paddle` component,
 we no longer need to manually register it with the `world`: the system
 will take care of that for us, as well as set up the storage.
 
-```rust,no_run,noplaypen
+```rust,edition2018,no_run,noplaypen
 # extern crate amethyst;
 # use amethyst::prelude::*;
 # use amethyst::renderer::{TextureHandle, SpriteSheetHandle};
@@ -370,8 +367,8 @@ will take care of that for us, as well as set up the storage.
 # fn initialise_camera(world: &mut World) { }
 # fn load_sprite_sheet(world: &mut World) -> SpriteSheetHandle { unimplemented!() }
 # struct MyState;
-# impl<'a, 'b> SimpleState<'a, 'b> for MyState {
-fn on_start(&mut self, data: StateData<GameData>) {
+# impl SimpleState for MyState {
+fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
     let world = data.world;
 
     // Load the spritesheet necessary to render the graphics.
@@ -392,5 +389,5 @@ keypresses, and move our game's paddles accordingly. In the next chapter, we'll
 explore another key concept in real-time games: time. We'll make our game aware
 of time, and add a ball for our paddles to bounce back and forth.
 
-[doc_time]: https://www.amethyst.rs/doc/master/doc/amethyst_core/timing/struct.Time.html
+[doc_time]: https://www.amethyst.rs/doc/latest/doc/amethyst_core/timing/struct.Time.html
 [doc_bindings]: https://www.amethyst.rs/doc/latest/doc/amethyst_input/struct.Bindings.html 

@@ -4,15 +4,14 @@ use gfx::texture::SamplerInfo;
 use gltf::{self, material::AlphaMode};
 use itertools::Itertools;
 
-use crate::{
-    assets::Source,
-    renderer::{
-        JpgFormat, MaterialPrefab, PngFormat, TextureData, TextureFormat, TextureMetadata,
-        TexturePrefab,
-    },
+use amethyst_assets::Source;
+use amethyst_error::Error;
+use amethyst_renderer::{
+    JpgFormat, MaterialPrefab, PngFormat, TextureData, TextureFormat, TextureMetadata,
+    TexturePrefab,
 };
 
-use super::{get_image_data, Buffers, GltfError, ImageFormat};
+use super::{get_image_data, Buffers, ImageFormat};
 
 // Load a single material, and transform into a format usable by the engine
 pub fn load_material(
@@ -20,7 +19,7 @@ pub fn load_material(
     buffers: &Buffers,
     source: Arc<dyn Source>,
     name: &str,
-) -> Result<MaterialPrefab<TextureFormat>, GltfError> {
+) -> Result<MaterialPrefab<TextureFormat>, Error> {
     let mut prefab = MaterialPrefab::default();
     prefab.albedo = Some(
         load_texture_with_factor(
@@ -30,7 +29,8 @@ pub fn load_material(
             source.clone(),
             name,
             true,
-        ).map(|(texture, _)| TexturePrefab::Data(texture))?,
+        )
+        .map(|(texture, _)| TexturePrefab::Data(texture))?,
     );
 
     let (metallic, roughness) = load_texture_with_factor(
@@ -47,7 +47,8 @@ pub fn load_material(
         source.clone(),
         name,
         false,
-    ).map(|(texture, factors)| deconstruct_metallic_roughness(texture, factors[0], factors[1]))
+    )
+    .map(|(texture, factors)| deconstruct_metallic_roughness(texture, factors[0], factors[1]))
     .map(|(metallic, roughness)| {
         (
             TexturePrefab::Data(metallic.0),
@@ -66,7 +67,8 @@ pub fn load_material(
             source.clone(),
             name,
             false,
-        ).map(|(texture, _)| TexturePrefab::Data(texture))?,
+        )
+        .map(|(texture, _)| TexturePrefab::Data(texture))?,
     );
 
     // Can't use map/and_then because of Result returning from the load_texture function
@@ -78,7 +80,8 @@ pub fn load_material(
                 source.clone(),
                 name,
                 false,
-            ).map(|data| TexturePrefab::Data(data))?,
+            )
+            .map(|data| TexturePrefab::Data(data))?,
         ),
 
         None => None,
@@ -93,7 +96,8 @@ pub fn load_material(
                 source.clone(),
                 name,
                 false,
-            ).map(|data| TexturePrefab::Data(data))?,
+            )
+            .map(|data| TexturePrefab::Data(data))?,
         ),
 
         None => None,
@@ -160,7 +164,7 @@ fn load_texture_with_factor(
     source: Arc<dyn Source>,
     name: &str,
     srgb: bool,
-) -> Result<(TextureData, [f32; 4]), GltfError> {
+) -> Result<(TextureData, [f32; 4]), Error> {
     match texture {
         Some(info) => Ok((
             load_texture(&info.texture(), buffers, source, name, srgb)?,
@@ -176,7 +180,7 @@ fn load_texture(
     source: Arc<dyn Source>,
     name: &str,
     srgb: bool,
-) -> Result<TextureData, GltfError> {
+) -> Result<TextureData, Error> {
     let (data, format) = get_image_data(&texture.source(), buffers, source, name.as_ref())?;
 
     let metadata = match srgb {

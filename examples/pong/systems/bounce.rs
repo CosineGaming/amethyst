@@ -1,12 +1,12 @@
+use crate::{
+    audio::{play_bounce, Sounds},
+    Ball, Paddle, Side,
+};
 use amethyst::{
     assets::AssetStorage,
     audio::{output::Output, Source},
     core::transform::Transform,
     ecs::prelude::{Join, Read, ReadExpect, ReadStorage, System, WriteStorage},
-};
-use crate::{
-    audio::{play_bounce, Sounds},
-    Ball, Paddle, Side,
 };
 use std::ops::Deref;
 
@@ -39,10 +39,9 @@ impl<'s> System<'s> for BounceSystem {
             let ball_y = transform.translation().y;
 
             // Bounce at the top or the bottom of the arena.
-            if ball_y <= ball.radius && ball.velocity[1] < 0.0 {
-                ball.velocity[1] = -ball.velocity[1];
-                play_bounce(&*sounds, &storage, audio_output.as_ref().map(|o| o.deref()));
-            } else if ball_y >= ARENA_HEIGHT - ball.radius && ball.velocity[1] > 0.0 {
+            if (ball_y <= ball.radius && ball.velocity[1] < 0.0)
+                || (ball_y >= ARENA_HEIGHT - ball.radius && ball.velocity[1] > 0.0)
+            {
                 ball.velocity[1] = -ball.velocity[1];
                 play_bounce(&*sounds, &storage, audio_output.as_ref().map(|o| o.deref()));
             }
@@ -65,10 +64,9 @@ impl<'s> System<'s> for BounceSystem {
                     paddle_x + paddle.width + ball.radius,
                     paddle_y + paddle.height + ball.radius,
                 ) {
-                    if paddle.side == Side::Left && ball.velocity[0] < 0.0 {
-                        ball.velocity[0] = -ball.velocity[0];
-                        play_bounce(&*sounds, &storage, audio_output.as_ref().map(|o| o.deref()));
-                    } else if paddle.side == Side::Right && ball.velocity[0] > 0.0 {
+                    if (paddle.side == Side::Left && ball.velocity[0] < 0.0)
+                        || (paddle.side == Side::Right && ball.velocity[0] > 0.0)
+                    {
                         ball.velocity[0] = -ball.velocity[0];
                         play_bounce(&*sounds, &storage, audio_output.as_ref().map(|o| o.deref()));
                     }

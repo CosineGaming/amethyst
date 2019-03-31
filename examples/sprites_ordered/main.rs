@@ -3,10 +3,6 @@
 //! Sprites are originally from <https://opengameart.org/content/bat-32x32>, edited to show
 //! layering and blending.
 
-extern crate amethyst;
-#[macro_use]
-extern crate log;
-
 mod png_loader;
 mod sprite;
 mod sprite_sheet_loader;
@@ -14,19 +10,21 @@ mod sprite_sheet_loader;
 use amethyst::{
     assets::{AssetStorage, Loader},
     core::{
-        nalgebra::Orthographic3,
+        math::Orthographic3,
         transform::{Transform, TransformBundle},
     },
     ecs::prelude::Entity,
     input::{get_key, is_close_requested, is_key_down},
     prelude::*,
     renderer::{
-        Camera, ColorMask, DepthMode, DisplayConfig, DrawFlat2D, ElementState, Hidden, Pipeline,
-        Projection, RenderBundle, ScreenDimensions, SpriteRender, SpriteSheet, SpriteSheetHandle,
-        Stage, Transparent, VirtualKeyCode, ALPHA,
+        Camera, DisplayConfig, DrawFlat2D, ElementState, Hidden, Pipeline, Projection,
+        RenderBundle, ScreenDimensions, SpriteRender, SpriteSheet, SpriteSheetHandle, Stage,
+        Transparent, VirtualKeyCode,
     },
     utils::application_root_dir,
 };
+
+use log::info;
 
 use crate::sprite::SpriteSheetDefinition;
 
@@ -86,8 +84,8 @@ impl Example {
     }
 }
 
-impl<'a, 'b> SimpleState<'a, 'b> for Example {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for Example {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let StateData { world, .. } = data;
 
         self.loaded_sprite_sheet = Some(load_sprite_sheet(world));
@@ -98,9 +96,9 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
 
     fn handle_event(
         &mut self,
-        mut data: StateData<GameData>,
+        mut data: StateData<'_, GameData<'_, '_>>,
         event: StateEvent,
-    ) -> SimpleTrans<'a, 'b> {
+    ) -> SimpleTrans {
         if let StateEvent::Window(event) = &event {
             if is_close_requested(&event) || is_key_down(&event, VirtualKeyCode::Escape) {
                 return Trans::Quit;
@@ -207,7 +205,7 @@ impl Example {
         };
 
         let mut camera_transform = Transform::default();
-        camera_transform.set_xyz(0.0, 0.0, self.camera_z);
+        camera_transform.set_translation_xyz(0.0, 0.0, self.camera_z);
 
         let camera = world
             .create_entity()
@@ -222,7 +220,8 @@ impl Example {
                 height,
                 0.0,
                 self.camera_depth_vision,
-            )))).build();
+            ))))
+            .build();
 
         self.camera = Some(camera);
     }
@@ -256,7 +255,7 @@ impl Example {
         };
         // This `Transform` moves the sprites to the middle of the window
         let mut common_transform = Transform::default();
-        common_transform.set_xyz(width / 2.0 - sprite_offset_x, height / 2.0, 0.0);
+        common_transform.set_translation_xyz(width / 2.0 - sprite_offset_x, height / 2.0, 0.0);
 
         self.draw_sprites(world, &common_transform);
     }
@@ -282,7 +281,11 @@ impl Example {
             } else {
                 i as f32
             };
-            sprite_transform.set_xyz((i * sprite_w) as f32 * SPRITE_SPACING_RATIO, z, z);
+            sprite_transform.set_translation_xyz(
+                (i * sprite_w) as f32 * SPRITE_SPACING_RATIO,
+                z,
+                z,
+            );
 
             // This combines multiple `Transform`ations.
             sprite_transform.concat(&common_transform);
@@ -349,24 +352,18 @@ fn load_sprite_sheet(world: &mut World) -> LoadedSpriteSheet {
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
 
-    let app_root = application_root_dir();
+    let app_root = application_root_dir()?;
 
-    let display_config = DisplayConfig::load(format!(
-        "{}/examples/sprites_ordered/resources/display_config.ron",
-        app_root
-    ));
+    let display_config =
+        DisplayConfig::load(app_root.join("examples/sprites_ordered/resources/display_config.ron"));
 
     let pipe = Pipeline::build().with_stage(
         Stage::with_backbuffer()
             .clear_target([0., 0., 0., 1.], 5.)
-            .with_pass(DrawFlat2D::new().with_transparency(
-                ColorMask::all(),
-                ALPHA,
-                Some(DepthMode::LessEqualWrite),
-            )),
+            .with_pass(DrawFlat2D::new()),
     );
 
-    let assets_directory = format!("{}/examples/assets/", app_root);
+    let assets_directory = app_root.join("examples/assets/");
 
     let game_data = GameDataBuilder::default()
         .with_bundle(TransformBundle::new())?

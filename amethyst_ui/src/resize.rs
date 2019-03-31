@@ -1,7 +1,9 @@
-use amethyst_core::shrev::ReaderId;
-use amethyst_core::specs::prelude::{
-    BitSet, Component, ComponentEvent, FlaggedStorage, Join, ReadExpect, Resources, System,
-    WriteStorage,
+use amethyst_core::{
+    ecs::prelude::{
+        BitSet, Component, ComponentEvent, FlaggedStorage, Join, ReadExpect, Resources, System,
+        WriteStorage,
+    },
+    shrev::ReaderId,
 };
 use amethyst_renderer::ScreenDimensions;
 
@@ -104,7 +106,7 @@ impl<'a> System<'a> for ResizeSystem {
     }
 
     fn setup(&mut self, res: &mut Resources) {
-        use amethyst_core::specs::prelude::SystemData;
+        use amethyst_core::ecs::prelude::SystemData;
         Self::SystemData::setup(res);
         self.screen_size = (0.0, 0.0);
         let mut resize = WriteStorage::<UiResize>::fetch(res);

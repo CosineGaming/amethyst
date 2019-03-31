@@ -6,12 +6,14 @@ use std::{
 };
 
 use gfx::Primitive;
+use log::warn;
+use serde::{Deserialize, Serialize};
 
 use amethyst_assets::Handle;
-use amethyst_core::nalgebra::{Matrix4, Point3, Rotation3, Translation3, Unit, Vector3};
+use amethyst_core::math::{Matrix4, Point3, Rotation3, Translation3, Unit, Vector3};
+use amethyst_error::Error;
 
 use crate::{
-    error::Result,
     types::{Factory, RawBuffer, Slice},
     vertex::{Attributes, VertexFormat},
 };
@@ -32,7 +34,7 @@ pub trait VertexData {
     fn len(&self) -> usize;
 
     /// Build `VertexBuffer`
-    fn build(&self, factory: &mut Factory) -> Result<VertexBuffer>;
+    fn build(&self, factory: &mut Factory) -> Result<VertexBuffer, Error>;
 }
 
 /// Construct new vertex data from raw data and vertex format
@@ -55,7 +57,7 @@ where
         self.0.as_ref().len()
     }
 
-    fn build(&self, factory: &mut Factory) -> Result<VertexBuffer> {
+    fn build(&self, factory: &mut Factory) -> Result<VertexBuffer, Error> {
         use gfx::{
             buffer::Role,
             memory::{cast_slice, Bind},
@@ -64,7 +66,10 @@ where
 
         let verts = self.0.as_ref();
         let slice = cast_slice(verts);
-        let stride = slice.len() / verts.len();
+        let stride = slice.len().checked_div(verts.len()).unwrap_or_else(|| {
+            warn!("Loading mesh with zero vertices.");
+            0
+        });
         let role = Role::Vertex;
         let bind = Bind::empty();
 
@@ -86,7 +91,7 @@ pub trait VertexDataSet {
     fn len(&self) -> usize;
 
     /// Build `VertexBuffer`s
-    fn build(&self, factory: &mut Factory) -> Result<Self::VertexBufferIter>;
+    fn build(&self, factory: &mut Factory) -> Result<Self::VertexBufferIter, Error>;
 }
 
 impl<H> VertexDataSet for (H, ())
@@ -99,7 +104,7 @@ where
         self.0.len()
     }
 
-    fn build(&self, factory: &mut Factory) -> Result<Self::VertexBufferIter> {
+    fn build(&self, factory: &mut Factory) -> Result<Self::VertexBufferIter, Error> {
         let (ref head, _) = *self;
         Ok(once(head.build(factory)?))
     }
@@ -117,7 +122,7 @@ where
         min(self.0.len(), self.1.len())
     }
 
-    fn build(&self, factory: &mut Factory) -> Result<Self::VertexBufferIter> {
+    fn build(&self, factory: &mut Factory) -> Result<Self::VertexBufferIter, Error> {
         let (ref head, ref tail) = *self;
         Ok(once(head.build(factory)?).chain(tail.build(factory)?))
     }
@@ -277,7 +282,7 @@ where
     }
 
     /// Builds and returns the new mesh.
-    pub fn build(self, fac: &mut Factory) -> Result<Mesh> {
+    pub fn build(self, fac: &mut Factory) -> Result<Mesh, Error> {
         use gfx::IndexBuffer;
         let count = self.vertices.len();
 

@@ -1,7 +1,12 @@
+use crate::{
+    config::{ArenaConfig, BallConfig, PaddlesConfig},
+    systems::ScoreText,
+    Ball, Paddle, Side,
+};
 use amethyst::{
     assets::Loader,
     core::{
-        nalgebra::{Vector2, Vector3},
+        math::{Vector2, Vector3},
         Transform,
     },
     ecs::prelude::World,
@@ -11,16 +16,11 @@ use amethyst::{
     },
     ui::{Anchor, TtfFormat, UiText, UiTransform},
 };
-use crate::{
-    config::{ArenaConfig, BallConfig, PaddlesConfig},
-    systems::ScoreText,
-    Ball, Paddle, Side,
-};
 
 pub struct Pong;
 
-impl<'a, 'b> SimpleState<'a, 'b> for Pong {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for Pong {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let StateData { world, .. } = data;
         use crate::audio::initialise_audio;
 
@@ -42,7 +42,7 @@ fn initialise_camera(world: &mut World) {
     };
 
     let mut transform = Transform::default();
-    transform.set_z(1.0);
+    transform.set_translation_z(1.0);
     world
         .create_entity()
         .with(Camera::from(Projection::orthographic(
@@ -50,7 +50,8 @@ fn initialise_camera(world: &mut World) {
             arena_width,
             0.0,
             arena_height,
-        ))).with(transform)
+        )))
+        .with(transform)
         .build();
 }
 
@@ -107,8 +108,8 @@ fn initialise_paddles(world: &mut World) {
 
     let left_y = (arena_height - left_height) / 2.0;
     let right_y = (arena_height - right_height) / 2.0;
-    left_transform.set_xyz(0.0, left_y, 0.0);
-    right_transform.set_xyz(arena_width - right_width, right_y, 0.0);
+    left_transform.set_translation_xyz(0.0, left_y, 0.0);
+    right_transform.set_translation_xyz(arena_width - right_width, right_y, 0.0);
 
     let left_mesh = create_mesh(
         world,
@@ -131,7 +132,8 @@ fn initialise_paddles(world: &mut World) {
             height: left_height,
             width: left_width,
             velocity: left_velocity,
-        }).with(left_transform)
+        })
+        .with(left_transform)
         .build();
     // Create right paddle
     world
@@ -143,7 +145,8 @@ fn initialise_paddles(world: &mut World) {
             height: right_height,
             width: right_width,
             velocity: right_velocity,
-        }).with(right_transform)
+        })
+        .with(right_transform)
         .build();
 }
 
@@ -167,7 +170,7 @@ fn initialise_balls(world: &mut World) {
     let mesh = create_mesh(world, generate_circle_vertices(radius, 16));
     let material = create_colour_material(world, colour);
     let mut local_transform = Transform::default();
-    local_transform.set_xyz(arena_width / 2.0, arena_height / 2.0, 0.0);
+    local_transform.set_translation_xyz(arena_width / 2.0, arena_height / 2.0, 0.0);
 
     world
         .create_entity()
@@ -176,7 +179,8 @@ fn initialise_balls(world: &mut World) {
         .with(Ball {
             radius: radius,
             velocity: [velocity_x, velocity_y],
-        }).with(local_transform)
+        })
+        .with(local_transform)
         .build();
 }
 
@@ -188,27 +192,11 @@ fn initialise_score(world: &mut World) {
         (),
         &world.read_resource(),
     );
-    let p1_transform = UiTransform::new(
-        "P1".to_string(),
-        Anchor::TopMiddle,
-        -50.,
-        50.,
-        1.,
-        55.,
-        50.,
-        0,
-    );
+    let p1_transform =
+        UiTransform::new("P1".to_string(), Anchor::TopMiddle, -50., 50., 1., 55., 50.);
 
-    let p2_transform = UiTransform::new(
-        "P2".to_string(),
-        Anchor::TopMiddle,
-        50.,
-        50.,
-        1.,
-        55.,
-        50.,
-        0,
-    );
+    let p2_transform =
+        UiTransform::new("P2".to_string(), Anchor::TopMiddle, 50., 50., 1., 55., 50.);
 
     let p1_score = world
         .create_entity()
@@ -218,7 +206,8 @@ fn initialise_score(world: &mut World) {
             "0".to_string(),
             [1.0, 1.0, 1.0, 1.0],
             50.,
-        )).build();
+        ))
+        .build();
     let p2_score = world
         .create_entity()
         .with(p2_transform)
@@ -227,7 +216,8 @@ fn initialise_score(world: &mut World) {
             "0".to_string(),
             [1.0, 1.0, 1.0, 1.0],
             50.,
-        )).build();
+        ))
+        .build();
     world.add_resource(ScoreText { p1_score, p2_score });
 }
 

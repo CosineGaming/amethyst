@@ -2,8 +2,11 @@
 
 use std::borrow::Borrow;
 
-use nalgebra::{self as na, Matrix4};
-use specs::prelude::{Component, DenseVecStorage, FlaggedStorage};
+use crate::{
+    ecs::prelude::{Component, DenseVecStorage, FlaggedStorage},
+    math::{self as na, Matrix4},
+};
+use serde::{Deserialize, Serialize};
 
 /// Performs a global transformation on the entity (transform from origin).
 ///

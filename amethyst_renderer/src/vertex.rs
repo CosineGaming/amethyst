@@ -5,8 +5,9 @@ use gfx::{
     pso::buffer::Element,
     traits::Pod,
 };
+use serde::{Deserialize, Serialize};
 
-use amethyst_core::nalgebra::{Vector2, Vector3};
+use amethyst_core::math::{Vector2, Vector3};
 
 /// Format for vertex attribute
 pub type AttributeFormat = Element<Format>;
@@ -301,7 +302,7 @@ impl With<TexCoord> for PosNormTex {
     };
 }
 
-/// Vertex format with position, normal, and UV texture coordinate attributes.
+/// Vertex format with position, normal, tangent, and UV texture coordinate attributes.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PosNormTangTex {

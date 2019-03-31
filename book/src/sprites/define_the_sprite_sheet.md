@@ -10,10 +10,10 @@ Here is an example of such a definition file:
 
 ```text,ignore
 (
-    // Width of the sprite sheet
-    spritesheet_width: 48,
-    // Height of the sprite sheet
-    spritesheet_height: 16,
+    // Width of the texture used by the sprite sheet
+    texture_width: 48,
+    // Height of the texture used by the sprite sheet
+    texture_height: 16,
     // List of sprites the sheet holds
     sprites: [
         (
@@ -42,7 +42,7 @@ Here is an example of such a definition file:
 
 Then, you can load it using the texture handle of the sheet's image you loaded earlier:
 
-```rust,no_run,noplaypen
+```rust,edition2018,no_run,noplaypen
 # extern crate amethyst;
 # use amethyst::assets::{Loader, AssetStorage};
 # use amethyst::renderer::{SpriteSheetFormat, SpriteSheet, TextureHandle};
@@ -81,13 +81,12 @@ The following table lists the differences between the coordinate systems:
 | Begin at the top left of the image    | Begin at the bottom left of the image     |
 | Increase to the right and down        | Increase to the right and up              |
 | Range from 0 to (width or height - 1) | Range from 0.0 to 1.0                     |
-| Use pixel values at exact coordinates | Takes average value of surrounding pixels |
 
 In Amethyst, pixel dimensions and texture coordinates are stored in the `Sprite` struct. Since texture coordinates can be derived from pixel coordinates, Amethyst provides the `Sprite::from_pixel_values` function to create a `Sprite`.
 
 The following snippet shows you how to naively define a `SpriteSheet`. In a real application, you would typically use the sprite sheet from file feature, which is much more convenient.
 
-```rust,no_run,noplaypen
+```rust,edition2018,no_run,noplaypen
 # extern crate amethyst;
 use amethyst::renderer::{Sprite, SpriteSheet, TextureCoordinates, TextureHandle};
 

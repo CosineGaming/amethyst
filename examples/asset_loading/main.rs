@@ -1,15 +1,13 @@
 //! Demonstrates loading custom assets using the Amethyst engine.
 // TODO: Add asset loader directory store for the meshes.
 
-extern crate amethyst;
-extern crate rayon;
-
 use amethyst::{
-    assets::{Loader, Result as AssetResult, SimpleFormat},
+    assets::{Loader, SimpleFormat},
     core::{
-        nalgebra::{Vector2, Vector3},
+        math::{Vector2, Vector3},
         Transform, TransformBundle,
     },
+    error::Error,
     input::InputBundle,
     prelude::*,
     renderer::{
@@ -17,7 +15,6 @@ use amethyst::{
         PosNormTex, Projection, Rgba,
     },
     utils::application_root_dir,
-    Error,
 };
 
 #[derive(Clone)]
@@ -29,7 +26,7 @@ impl SimpleFormat<Mesh> for Custom {
     type Options = ();
 
     /// Reads the given bytes and produces asset data.
-    fn import(&self, bytes: Vec<u8>, _: ()) -> AssetResult<MeshData> {
+    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<MeshData, Error> {
         let data: String = String::from_utf8(bytes)?;
 
         let trimmed: Vec<&str> = data.lines().filter(|line| line.len() >= 1).collect();
@@ -63,8 +60,8 @@ impl SimpleFormat<Mesh> for Custom {
 
 struct AssetsExample;
 
-impl<'a, 'b> SimpleState<'a, 'b> for AssetsExample {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for AssetsExample {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let StateData { world, .. } = data;
         world.add_resource(0usize);
 
@@ -90,7 +87,7 @@ impl<'a, 'b> SimpleState<'a, 'b> for AssetsExample {
         };
 
         let mut trans = Transform::default();
-        trans.set_xyz(-5.0, 0.0, 0.0);
+        trans.set_translation_xyz(-5.0, 0.0, 0.0);
         trans.set_scale(2.0, 2.0, 2.0);
         world
             .create_entity()
@@ -104,15 +101,13 @@ impl<'a, 'b> SimpleState<'a, 'b> for AssetsExample {
 fn main() -> Result<(), Error> {
     amethyst::start_logger(Default::default());
 
-    let app_root = application_root_dir();
+    let app_root = application_root_dir()?;
 
     // Add our meshes directory to the asset loader.
-    let resources_directory = format!("{}/examples/assets", app_root);
+    let resources_directory = app_root.join("examples/assets");
 
-    let display_config_path = format!(
-        "{}/examples/asset_loading/resources/display_config.ron",
-        app_root
-    );
+    let display_config_path =
+        app_root.join("{}/examples/asset_loading/resources/display_config.ron");
 
     let game_data = GameDataBuilder::default()
         .with_bundle(InputBundle::<String, String>::new())?
@@ -126,15 +121,16 @@ fn main() -> Result<(), Error> {
 
 fn initialise_camera(world: &mut World) {
     let mut transform = Transform::default();
-    transform.set_xyz(0.0, -20.0, 10.0);
-    transform.rotate_local(Vector3::x_axis(), 1.3257521);
+    transform.set_translation_xyz(0.0, -20.0, 10.0);
+    transform.prepend_rotation_x_axis(1.3257521);
 
     world
         .create_entity()
         .with(Camera::from(Projection::perspective(
             1.0,
             std::f32::consts::FRAC_PI_3,
-        ))).with(transform)
+        )))
+        .with(transform)
         .build();
 }
 
@@ -145,10 +141,11 @@ fn initialise_lights(world: &mut World) {
         radius: 1.0,
         color: Rgba::white(),
         ..Default::default()
-    }.into();
+    }
+    .into();
 
     let mut transform = Transform::default();
-    transform.set_xyz(5.0, -20.0, 15.0);
+    transform.set_translation_xyz(5.0, -20.0, 15.0);
 
     // Add point light.
     world.create_entity().with(light).with(transform).build();

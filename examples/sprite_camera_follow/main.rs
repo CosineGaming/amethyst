@@ -1,5 +1,3 @@
-extern crate amethyst;
-
 use amethyst::{
     assets::{AssetStorage, Loader},
     core::{Parent, Transform, TransformBundle},
@@ -7,9 +5,9 @@ use amethyst::{
     input::{InputBundle, InputHandler},
     prelude::*,
     renderer::{
-        Camera, ColorMask, DepthMode, DisplayConfig, DrawFlat2D, Pipeline, PngFormat, Projection,
-        RenderBundle, SpriteRender, SpriteSheet, SpriteSheetFormat, SpriteSheetHandle, Stage,
-        Texture, TextureMetadata, Transparent, ALPHA,
+        Camera, DisplayConfig, DrawFlat2D, Pipeline, PngFormat, Projection, RenderBundle,
+        ScreenSpace, SpriteRender, SpriteSheet, SpriteSheetFormat, SpriteSheetHandle, Stage,
+        Texture, TextureMetadata, Transparent,
     },
     utils::application_root_dir,
 };
@@ -35,8 +33,8 @@ impl<'s> System<'s> for MovementSystem {
         let y_move = input.axis_value("entity_y").unwrap();
 
         for (_, transform) in (&players, &mut transforms).join() {
-            transform.translate_x(x_move as f32 * 5.0);
-            transform.translate_y(y_move as f32 * 5.0);
+            transform.prepend_translation_x(x_move as f32 * 5.0);
+            transform.prepend_translation_y(y_move as f32 * 5.0);
         }
     }
 }
@@ -67,7 +65,7 @@ fn load_sprite_sheet(world: &mut World, png_path: &str, ron_path: &str) -> Sprit
 // Initialize a background
 fn init_background_sprite(world: &mut World, sprite_sheet: &SpriteSheetHandle) -> Entity {
     let mut transform = Transform::default();
-    transform.set_z(-10.0);
+    transform.set_translation_z(-10.0);
     let sprite = SpriteRender {
         sprite_sheet: sprite_sheet.clone(),
         sprite_number: 0,
@@ -78,8 +76,7 @@ fn init_background_sprite(world: &mut World, sprite_sheet: &SpriteSheetHandle) -
 // Initialize a sprite as a reference point at a fixed location
 fn init_reference_sprite(world: &mut World, sprite_sheet: &SpriteSheetHandle) -> Entity {
     let mut transform = Transform::default();
-    transform.set_x(100.0);
-    transform.set_y(0.0);
+    transform.set_translation_xyz(100.0, 0.0, 0.0);
     let sprite = SpriteRender {
         sprite_sheet: sprite_sheet.clone(),
         sprite_number: 0,
@@ -92,10 +89,26 @@ fn init_reference_sprite(world: &mut World, sprite_sheet: &SpriteSheetHandle) ->
         .build()
 }
 
+// Initialize a sprite as a reference point using a screen position
+fn init_screen_reference_sprite(world: &mut World, sprite_sheet: &SpriteSheetHandle) -> Entity {
+    let mut transform = Transform::default();
+    transform.set_translation_xyz(60.0, 10.0, -20.0);
+    let sprite = SpriteRender {
+        sprite_sheet: sprite_sheet.clone(),
+        sprite_number: 0,
+    };
+    world
+        .create_entity()
+        .with(transform)
+        .with(sprite)
+        .with(Transparent)
+        .with(ScreenSpace)
+        .build()
+}
+
 fn init_player(world: &mut World, sprite_sheet: &SpriteSheetHandle) -> Entity {
     let mut transform = Transform::default();
-    transform.set_x(0.0);
-    transform.set_y(0.0);
+    transform.set_translation_xyz(0.0, 0.0, 0.0);
     let sprite = SpriteRender {
         sprite_sheet: sprite_sheet.clone(),
         sprite_number: 1,
@@ -109,22 +122,23 @@ fn init_player(world: &mut World, sprite_sheet: &SpriteSheetHandle) -> Entity {
         .build()
 }
 
-fn init_camera(world: &mut World, parent: Entity) {
+fn init_camera(world: &mut World, parent: Entity) -> Entity {
     let mut transform = Transform::default();
-    transform.set_z(1.0);
+    transform.set_translation_z(1.0);
     world
         .create_entity()
         .with(Camera::from(Projection::orthographic(
             -250.0, 250.0, -250.0, 250.0,
-        ))).with(Parent { entity: parent })
+        )))
+        .with(Parent { entity: parent })
         .with(transform)
-        .build();
+        .build()
 }
 
 struct Example;
 
-impl<'a, 'b> SimpleState<'a, 'b> for Example {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for Example {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let world = data.world;
         let circle_sprite_sheet_handle =
             load_sprite_sheet(world, "Circle_Spritesheet.png", "Circle_Spritesheet.ron");
@@ -134,34 +148,28 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
         let _background = init_background_sprite(world, &background_sprite_sheet_handle);
         let _reference = init_reference_sprite(world, &circle_sprite_sheet_handle);
         let parent = init_player(world, &circle_sprite_sheet_handle);
-        init_camera(world, parent);
+        let _camera_entity = init_camera(world, parent);
+        let _reference_screen = init_screen_reference_sprite(world, &circle_sprite_sheet_handle);
     }
 }
 
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
 
-    let root = format!(
-        "{}/examples/sprite_camera_follow/resources",
-        application_root_dir()
-    );
-    let config = DisplayConfig::load(format!("{}/display_config.ron", root));
+    let root = application_root_dir()?.join("examples/sprite_camera_follow/resources");
+    let config = DisplayConfig::load(root.join("display_config.ron"));
     let pipe = Pipeline::build().with_stage(
         Stage::with_backbuffer()
             .clear_target([0.1, 0.1, 0.1, 1.0], 1.0)
-            .with_pass(DrawFlat2D::new().with_transparency(
-                ColorMask::all(),
-                ALPHA,
-                Some(DepthMode::LessEqualWrite), // Tells the pipeline to respect sprite z-depth
-            )),
+            .with_pass(DrawFlat2D::new()),
     );
 
     let game_data = GameDataBuilder::default()
         .with_bundle(TransformBundle::new())?
         .with_bundle(
-            InputBundle::<String, String>::new()
-                .with_bindings_from_file(format!("{}/input.ron", root))?,
-        )?.with(MovementSystem, "movement", &[])
+            InputBundle::<String, String>::new().with_bindings_from_file(root.join("input.ron"))?,
+        )?
+        .with(MovementSystem, "movement", &[])
         .with_bundle(
             RenderBundle::new(pipe, Some(config))
                 .with_sprite_sheet_processor()

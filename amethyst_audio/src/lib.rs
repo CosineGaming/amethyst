@@ -1,19 +1,5 @@
-#![warn(missing_docs, rust_2018_idioms, rust_2018_compatibility)]
-
 //! Loading and playing of audio files.
-extern crate amethyst_assets;
-extern crate amethyst_core;
-extern crate cpal;
-#[macro_use]
-extern crate log;
-extern crate rodio;
-#[macro_use]
-extern crate serde;
-extern crate smallvec;
-
-#[macro_use]
-#[cfg(feature = "profiler")]
-extern crate thread_profiler;
+#![warn(missing_docs, rust_2018_idioms, rust_2018_compatibility)]
 
 pub use self::{
     bundle::AudioBundle,
@@ -24,12 +10,12 @@ pub use self::{
     systems::*,
 };
 
-pub mod output;
-
 use std::{
     error::Error,
     fmt::{Display, Formatter, Result as FmtResult},
 };
+
+pub mod output;
 
 mod bundle;
 mod components;

@@ -1,10 +1,16 @@
 //! Camera type with support for perspective and orthographic projections.
 
-use amethyst_assets::{PrefabData, PrefabError};
+use amethyst_assets::PrefabData;
 use amethyst_core::{
-    nalgebra::{Matrix4, Orthographic3, Perspective3},
-    specs::prelude::{Component, Entity, HashMapStorage, Write, WriteStorage},
+    ecs::prelude::{Component, Entity, HashMapStorage, Write, WriteStorage},
+    math::{Matrix4, Orthographic3, Perspective3, Point2, Point3},
+    GlobalTransform,
 };
+use amethyst_error::Error;
+
+use serde::{Deserialize, Serialize};
+
+use crate::ScreenDimensions;
 
 /// The projection mode of a `Camera`.
 ///
@@ -73,6 +79,27 @@ impl Camera {
             std::f32::consts::FRAC_PI_3,
         ))
     }
+
+    /// Transforms position from screen space to camera space
+    pub fn position_from_screen(
+        &self,
+        screen_position: Point2<f32>,
+        camera_transform: &GlobalTransform,
+        screen_dimensions: &ScreenDimensions,
+    ) -> Point3<f32> {
+        let screen_x = 2.0 * screen_position.x / screen_dimensions.width() - 1.0;
+        let screen_y = 1.0 - 2.0 * screen_position.y / screen_dimensions.height();
+        let screen_point = Point3::new(screen_x, screen_y, 0.0).to_homogeneous();
+
+        let vector = camera_transform.0
+            * self
+                .proj
+                .try_inverse()
+                .expect("Camera projection matrix is not invertible")
+            * screen_point;
+
+        Point3::from_homogeneous(vector).expect("Vector is not homogeneous")
+    }
 }
 
 impl Component for Camera {
@@ -81,10 +108,10 @@ impl Component for Camera {
 
 /// Active camera resource, used by the renderer to choose which camera to get the view matrix from.
 /// If no active camera is found, the first camera will be used as a fallback.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct ActiveCamera {
     /// Camera entity
-    pub entity: Entity,
+    pub entity: Option<Entity>,
 }
 
 /// Projection prefab
@@ -115,13 +142,14 @@ impl<'a> PrefabData<'a> for CameraPrefab {
         entity: Entity,
         storage: &mut Self::SystemData,
         _: &[Entity],
-    ) -> Result<(), PrefabError> {
+    ) -> Result<(), Error> {
         let proj = match *self {
             CameraPrefab::Matrix(mat) => mat,
             CameraPrefab::Orthographic(ortho) => ortho.to_homogeneous(),
             CameraPrefab::Perspective(perspective) => perspective.to_homogeneous(),
         };
-        storage.insert(entity, Camera { proj }).map(|_| ())
+        storage.insert(entity, Camera { proj }).map(|_| ())?;
+        Ok(())
     }
 }
 
@@ -129,7 +157,7 @@ impl<'a> PrefabData<'a> for CameraPrefab {
 pub struct ActiveCameraPrefab(usize);
 
 impl<'a> PrefabData<'a> for ActiveCameraPrefab {
-    type SystemData = (Option<Write<'a, ActiveCamera>>,);
+    type SystemData = (Write<'a, ActiveCamera>,);
     type Result = ();
 
     fn add_to_entity(
@@ -137,10 +165,8 @@ impl<'a> PrefabData<'a> for ActiveCameraPrefab {
         _: Entity,
         system_data: &mut Self::SystemData,
         entities: &[Entity],
-    ) -> Result<(), PrefabError> {
-        if let Some(ref mut cam) = system_data.0 {
-            cam.entity = entities[self.0];
-        }
+    ) -> Result<(), Error> {
+        system_data.0.entity = Some(entities[self.0]);
         // TODO: if no `ActiveCamera` insert using `LazyUpdate`, require changes to `specs`
         Ok(())
     }
@@ -151,10 +177,11 @@ mod serde_ortho {
 
     use serde::{
         de::{self, Deserializer, MapAccess, SeqAccess, Visitor},
-        ser::{Serialize, Serializer},
+        ser::Serializer,
+        Deserialize, Serialize,
     };
 
-    use amethyst_core::nalgebra::Orthographic3;
+    use amethyst_core::math::Orthographic3;
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Orthographic3<f32>, D::Error>
     where
@@ -268,8 +295,7 @@ mod serde_ortho {
             }
         }
 
-        const FIELDS: &'static [&'static str] =
-            &["left", "right", "bottom", "top", "znear", "zfar"];
+        const FIELDS: &[&str] = &["left", "right", "bottom", "top", "znear", "zfar"];
         deserializer.deserialize_struct("Orthographic", FIELDS, OrthographicVisitor)
     }
 
@@ -306,10 +332,11 @@ mod serde_persp {
 
     use serde::{
         de::{self, Deserializer, MapAccess, SeqAccess, Visitor},
-        ser::{Serialize, Serializer},
+        ser::Serializer,
+        Deserialize, Serialize,
     };
 
-    use amethyst_core::nalgebra::Perspective3;
+    use amethyst_core::math::Perspective3;
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Perspective3<f32>, D::Error>
     where
@@ -399,7 +426,7 @@ mod serde_persp {
             }
         }
 
-        const FIELDS: &'static [&'static str] = &["aspect", "fovy", "znear", "zfar"];
+        const FIELDS: &[&str] = &["aspect", "fovy", "znear", "zfar"];
         deserializer.deserialize_struct("Perspective", FIELDS, PerspectiveVisitor)
     }
 

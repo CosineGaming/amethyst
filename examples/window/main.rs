@@ -1,7 +1,5 @@
 //! Opens an empty window.
 
-extern crate amethyst;
-
 use amethyst::{
     input::is_key_down,
     prelude::*,
@@ -12,8 +10,12 @@ use amethyst::{
 
 struct Example;
 
-impl<'a, 'b> SimpleState<'a, 'b> for Example {
-    fn handle_event(&mut self, _: StateData<GameData>, event: StateEvent) -> SimpleTrans<'a, 'b> {
+impl SimpleState for Example {
+    fn handle_event(
+        &mut self,
+        _: StateData<'_, GameData<'_, '_>>,
+        event: StateEvent,
+    ) -> SimpleTrans {
         if let StateEvent::Window(event) = event {
             if is_key_down(&event, VirtualKeyCode::Escape) {
                 Trans::Quit
@@ -29,10 +31,7 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
 
-    let path = format!(
-        "{}/examples/window/resources/display_config.ron",
-        application_root_dir()
-    );
+    let path = application_root_dir()?.join("examples/window/resources/display_config.ron");
     let config = DisplayConfig::load(&path);
 
     let pipe = Pipeline::build().with_stage(

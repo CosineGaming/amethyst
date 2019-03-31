@@ -1,14 +1,13 @@
-use std::result::Result as StdResult;
-
 use gfx::format::{ChannelType, Format, SurfaceType};
+use serde::{Deserialize, Serialize};
 
-use amethyst_assets::{PrefabData, PrefabError};
-use amethyst_core::specs::prelude::{
+use amethyst_assets::PrefabData;
+use amethyst_core::ecs::prelude::{
     Component, DenseVecStorage, Entity, FlaggedStorage, WriteStorage,
 };
+use amethyst_error::Error;
 
 use crate::{
-    error::Result,
     formats::MeshCreator,
     mesh::{Mesh, MeshBuilder},
     renderer::Renderer,
@@ -63,7 +62,7 @@ pub type AnimatedVertexBufferCombination = (
 fn build_mesh_with_combo(
     combo: AnimatedVertexBufferCombination,
     renderer: &mut Renderer,
-) -> Result<Mesh> {
+) -> Result<Mesh, Error> {
     build_mesh_with_some!(
         MeshBuilder::new(combo.0),
         renderer,
@@ -91,7 +90,7 @@ impl AnimatedComboMeshCreator {
 }
 
 impl MeshCreator for AnimatedComboMeshCreator {
-    fn build(self: Box<Self>, renderer: &mut Renderer) -> Result<Mesh> {
+    fn build(self: Box<Self>, renderer: &mut Renderer) -> Result<Mesh, Error> {
         build_mesh_with_combo(self.combo, renderer)
     }
 
@@ -128,7 +127,7 @@ impl<'a> PrefabData<'a> for JointTransformsPrefab {
         entity: Entity,
         storage: &mut Self::SystemData,
         entities: &[Entity],
-    ) -> StdResult<(), PrefabError> {
+    ) -> Result<(), Error> {
         storage
             .insert(
                 entity,
@@ -136,6 +135,9 @@ impl<'a> PrefabData<'a> for JointTransformsPrefab {
                     skin: entities[self.skin],
                     matrices: vec![[[0.; 4]; 4]; self.size],
                 },
-            ).map(|_| ())
+            )
+            .map(|_| ())?;
+
+        Ok(())
     }
 }
