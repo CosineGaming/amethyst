@@ -12,8 +12,7 @@ use std::{
 
 use amethyst_core::ecs::{Join, Resources, System, SystemData, WriteStorage, Entities};
 
-use laminar::{DeliveryMethod, NetworkConfig, Packet};
-use laminar::net::UdpSocket;
+use laminar::Packet;
 use log::{error, warn};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -155,7 +154,7 @@ where
     );
 
     fn run(&mut self, (entities, mut net_connections): Self::SystemData) {
-        for mut net_connection in (&mut net_connections).join() {
+        for net_connection in (&mut net_connections).join() {
             let target = net_connection.target_receiver;
 
             if net_connection.state == ConnectionState::Connected
@@ -179,9 +178,9 @@ where
             for _ in 0..2 {
                 let mut matched = false;
                 // Get the NetConnection from the source
-                for mut net_connection in (&mut net_connections).join() {
+                for net_connection in (&mut net_connections).join() {
                     // We found the origin
-                    if net_connection.target == raw_event.addr() {
+                    if net_connection.target_sender == raw_event.addr() {
                         matched = true;
                         // Get the event
                         match deserialize_event::<E>(raw_event.payload()) {
@@ -205,7 +204,8 @@ where
                     // Bring in the entities so that we can add a NetConnection
                     info!("MAKING A NETCONNECTION!!!! LOL GREP FOR XDXD");
                     entities.build_entity()
-                        .with(NetConnection::<E>::new(raw_event.source), &mut net_connections)
+	                    // We need to assume the target will receive from the same address as they sent from, perhaps a (TODO) proper connection builder would send the recieve address as the next packet
+                        .with(NetConnection::<E>::new(raw_event.addr(), raw_event.addr()), &mut net_connections)
                         .build();
                 }
                 else {
