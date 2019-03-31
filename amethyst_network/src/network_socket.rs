@@ -154,20 +154,9 @@ where
         WriteStorage<'a, NetConnection<E>>
     );
 
-<<<<<<< HEAD
-    fn setup(&mut self, res: &mut Resources) {
-        Self::SystemData::setup(res);
-    }
-
     fn run(&mut self, (entities, mut net_connections): Self::SystemData) {
-        info!("start of NS::run");
         for mut net_connection in (&mut net_connections).join() {
-            let target = net_connection.target;
-=======
-    fn run(&mut self, mut net_connections: Self::SystemData) {
-        for net_connection in (&mut net_connections).join() {
             let target = net_connection.target_receiver;
->>>>>>> origin/master
 
             if net_connection.state == ConnectionState::Connected
                 || net_connection.state == ConnectionState::Connecting
@@ -185,29 +174,29 @@ where
             }
         }
 
-<<<<<<< HEAD
-        for raw_event in self.rx.try_iter() {
+        for (counter, raw_event) in self.transport_receiver.try_iter().enumerate() {
+	        // Do it twice to collect from activated connections
             for _ in 0..2 {
                 let mut matched = false;
                 // Get the NetConnection from the source
                 for mut net_connection in (&mut net_connections).join() {
                     // We found the origin
-                    if net_connection.target == raw_event.source {
+                    if net_connection.target == raw_event.addr() {
                         matched = true;
                         // Get the event
-                        let net_event = deserialize_event::<E>(raw_event.data.as_slice());
-                        match net_event {
+                        match deserialize_event::<E>(raw_event.payload()) {
                             Ok(ev) => {
                                 net_connection.receive_buffer.single_write(ev);
                             }
                             Err(e) => error!(
                                 "Failed to deserialize an incoming network event: {} From source: {:?}",
-                                e, raw_event.source
+                                e,
+                                raw_event.addr()
                             ),
                         }
                         // No two NetConnections can share a target
                         break;
-                    }
+	                }
                 }
                 if !matched {
                     // Instead of just complaining about missing this source we are going to make a
@@ -221,25 +210,6 @@ where
                 }
                 else {
                     break
-=======
-        for (counter, raw_event) in self.transport_receiver.try_iter().enumerate() {
-            // Get the NetConnection from the source
-            for net_connection in (&mut net_connections).join() {
-                if net_connection.target_sender == raw_event.addr() {
-                    // Get the event
-                    match deserialize_event::<E>(raw_event.payload()) {
-                        Ok(ev) => {
-                            net_connection.receive_buffer.single_write(ev);
-                        }
-                        Err(e) => error!(
-                            "Failed to deserialize an incoming network event: {} From source: {:?}",
-                            e,
-                            raw_event.addr()
-                        ),
-                    }
-                } else {
-                    warn!("Received packet from unknown source");
->>>>>>> origin/master
                 }
             }
 
