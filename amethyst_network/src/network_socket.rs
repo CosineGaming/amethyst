@@ -10,7 +10,7 @@ use std::{
     thread,
 };
 
-use amethyst_core::ecs::{Join, Resources, System, SystemData, WriteStorage};
+use amethyst_core::ecs::{Join, Resources, System, SystemData, WriteStorage, Entities};
 
 use laminar::Packet;
 use log::{error, warn};
@@ -23,6 +23,8 @@ use super::{
     server::{Host, ReceiveHandler, SendHandler, ServerConfig, ServerSocketEvent},
     ConnectionState, NetConnection, NetEvent, NetFilter,
 };
+
+use log::info;
 
 enum InternalSocketEvent<E> {
     SendEvents {
@@ -146,9 +148,12 @@ impl<'a, E> System<'a> for NetSocketSystem<E>
 where
     E: Send + Sync + Serialize + Clone + DeserializeOwned + PartialEq + 'static,
 {
-    type SystemData = (WriteStorage<'a, NetConnection<E>>);
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, NetConnection<E>>
+    );
 
-    fn run(&mut self, mut net_connections: Self::SystemData) {
+    fn run(&mut self, (entities, mut net_connections): Self::SystemData) {
         for net_connection in (&mut net_connections).join() {
             let target = net_connection.target_receiver;
 
@@ -169,22 +174,42 @@ where
         }
 
         for (counter, raw_event) in self.transport_receiver.try_iter().enumerate() {
-            // Get the NetConnection from the source
-            for net_connection in (&mut net_connections).join() {
-                if net_connection.target_sender == raw_event.addr() {
-                    // Get the event
-                    match deserialize_event::<E>(raw_event.payload()) {
-                        Ok(ev) => {
-                            net_connection.receive_buffer.single_write(ev);
+	        // Do it twice to collect from activated connections
+            for _ in 0..2 {
+                let mut matched = false;
+                // Get the NetConnection from the source
+                for net_connection in (&mut net_connections).join() {
+                    // We found the origin
+                    if net_connection.target_sender == raw_event.addr() {
+                        matched = true;
+                        // Get the event
+                        match deserialize_event::<E>(raw_event.payload()) {
+                            Ok(ev) => {
+                                net_connection.receive_buffer.single_write(ev);
+                            }
+                            Err(e) => error!(
+                                "Failed to deserialize an incoming network event: {} From source: {:?}",
+                                e,
+                                raw_event.addr()
+                            ),
                         }
-                        Err(e) => error!(
-                            "Failed to deserialize an incoming network event: {} From source: {:?}",
-                            e,
-                            raw_event.addr()
-                        ),
-                    }
-                } else {
-                    warn!("Received packet from unknown source");
+                        // No two NetConnections can share a target
+                        break;
+	                }
+                }
+                if !matched {
+                    // Instead of just complaining about missing this source we are going to make a
+                    // new NetConnection to receive from this source
+                    // TODO: This is of course susceptible to DoS so uhhhh we need to deal with that
+                    // Bring in the entities so that we can add a NetConnection
+                    info!("MAKING A NETCONNECTION!!!! LOL GREP FOR XDXD");
+                    entities.build_entity()
+	                    // We need to assume the target will receive from the same address as they sent from, perhaps a (TODO) proper connection builder would send the recieve address as the next packet
+                        .with(NetConnection::<E>::new(raw_event.addr(), raw_event.addr()), &mut net_connections)
+                        .build();
+                }
+                else {
+                    break
                 }
             }
 
@@ -195,6 +220,7 @@ where
                 break;
             }
         }
+        info!("end of NS::run");
     }
 
     fn setup(&mut self, res: &mut Resources) {
